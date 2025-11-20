@@ -3,6 +3,7 @@ import { askAI } from "@/lib/openai";
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+export const runtime = 'edge';
 
 if (!process.env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN missing");
 if (!process.env.TELEGRAM_SECRET_TOKEN) throw new Error("TELEGRAM_SECRET_TOKEN missing");
