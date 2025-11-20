@@ -6,7 +6,7 @@ export const runtime = 'edge';
 export const config = {
   maxDuration: 60,
 
-}
+};
   
 // --- 1. VALIDATION ---
 if (!process.env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is missing");
