@@ -1,76 +1,100 @@
 import { Bot, webhookCallback, InlineKeyboard } from "grammy";
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
-// ⚡️ CONFIG: EDGE RUNTIME (This makes it fast & bypasses timeout)
-export const runtime = 'edge'; 
+// 🚀 PERFORMANCE: Use Edge Runtime (Prevents 504 Timeouts)
+export const runtime = 'edge';
 
-// 1. VALIDATION
-if (!process.env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN missing");
-if (!process.env.TELEGRAM_SECRET_TOKEN) throw new Error("TELEGRAM_SECRET_TOKEN missing");
-if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
+// --- 1. VALIDATION ---
+if (!process.env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is missing");
+if (!process.env.TELEGRAM_SECRET_TOKEN) throw new Error("TELEGRAM_SECRET_TOKEN is missing");
+if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is missing");
 
-// 2. SETUP
+// --- 2. INIT ---
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 3. HARDCODED CONTEXT (Because Edge cannot read files)
+// --- 3. KNOWLEDGE BASE (Hardcoded for Edge Speed) ---
 const CONTEXT_DATA = `
 SYSTEM_NAME: DG Academy AI Coach
 WEBSITE: https://dgnext.org
-ORGANIZATION: DG Academy (DG Next) is a premier AI & Tech education platform in Cambodia.
-COURSES: AI & Data Science, Digital Leadership, Soft Skills.
-ACTIONS: 
+CONTEXT: DG Academy (DG Next) is a premier AI education platform in Cambodia.
+OFFERINGS:
+- AI & Data Science Courses
+- Digital Leadership Training
+- VR/AR Experiences
+ACTIONS:
 - Register: https://dgnext.org/authstudent
 - Contact: contact@dgdemy.org
-INSTRUCTIONS: Be concise. Max 2 sentences. Use emojis.
+INSTRUCTIONS: Answer concisely (max 3 sentences). Be friendly and encouraging.
 `;
 
-// 4. AI FUNCTION (Inside this file now)
+// --- 4. AI LOGIC ---
 async function askAI(text: string) {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_tokens: 150, 
+      max_tokens: 150,
       messages: [
         { role: "system", content: CONTEXT_DATA },
         { role: "user", content: text }
       ]
     });
-    return completion.choices[0].message.content || "Try again.";
+    return completion.choices[0].message.content || "Please try again.";
   } catch (e) {
-    console.error(e);
-    return "I'm thinking too hard. Please ask again!";
+    console.error("AI Error:", e);
+    return "I am currently experiencing high traffic. Please try again later.";
   }
 }
 
-// 5. BOT LOGIC
+// --- 5. BOT COMMANDS ---
 bot.command("start", async (ctx) => {
   const keyboard = new InlineKeyboard()
-    .url("🌐 Visit DGNext", "https://dgnext.org");
-  await ctx.reply("👋 **I am the DG Academy AI Coach!**\n\nAsk me about our courses.", { parse_mode: "Markdown", reply_markup: keyboard });
+    .url("🌐 Visit DG Next", "https://dgnext.org");
+  await ctx.reply("👋 **Welcome to DG Academy!**\n\nI am your AI Coach. Ask me about our courses or how to register!", { parse_mode: "Markdown", reply_markup: keyboard });
 });
 
 bot.on("message:text", async (ctx) => {
   const text = ctx.message.text;
   
-  // Quick keyword check for buttons
-  if (/register|sign up/i.test(text)) {
-    const keyboard = new InlineKeyboard().url("📝 Register Here", "https://dgnext.org/authstudent");
-    return ctx.reply("Click below to register:", { reply_markup: keyboard });
+  // Smart Button Check
+  if (/register|sign up|join/i.test(text)) {
+    const keyboard = new InlineKeyboard().url("📝 Register Now", "https://dgnext.org/authstudent");
+    return ctx.reply("Click below to start your journey:", { reply_markup: keyboard });
   }
 
-  // Show typing status
   await ctx.replyWithChatAction("typing");
-  
-  // Get AI Answer
   const response = await askAI(text);
   await ctx.reply(response);
 });
 
-// 6. WEBHOOK HANDLER
+// --- 6. THE "MAGIC" SETUP HANDLER (GET) ---
+// Visits to this URL will automatically set the Webhook
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const webhookUrl = `${url.protocol}//${url.host}/api/bot`;
+
+    // 1. Delete old webhook to clear jams
+    await bot.api.deleteWebhook({ drop_pending_updates: true });
+
+    // 2. Set new webhook with the Secret Token from .env
+    await bot.api.setWebhook(webhookUrl, {
+      secret_token: process.env.TELEGRAM_SECRET_TOKEN
+    });
+
+    return new Response(`✅ Success! Webhook set to: ${webhookUrl}`, { status: 200 });
+  } catch (e: any) {
+    return new Response(`❌ Error: ${e.message}`, { status: 500 });
+  }
+}
+
+// --- 7. THE BOT HANDLER (POST) ---
+// Telegram sends messages here
 export async function POST(req: Request) {
   const secretToken = req.headers.get("x-telegram-bot-api-secret-token");
-  if (secretToken !== process.env.TELEGRAM_SECRET_TOKEN) return new Response("Unauthorized", { status: 401 });
+  if (secretToken !== process.env.TELEGRAM_SECRET_TOKEN) {
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   try {
     return await webhookCallback(bot, "std/http")(req);
