@@ -3,7 +3,11 @@ import OpenAI from "openai";
 
 // 🚀 PERFORMANCE: Use Edge Runtime (Prevents 504 Timeouts)
 export const runtime = 'edge';
+export const config = {
+  maxDuration: 60,
 
+}
+  
 // --- 1. VALIDATION ---
 if (!process.env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is missing");
 if (!process.env.TELEGRAM_SECRET_TOKEN) throw new Error("TELEGRAM_SECRET_TOKEN is missing");
